@@ -1,5 +1,6 @@
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import validates
+from sqlalchemy.ext.associationproxy import association_proxy
 from sqlalchemy_serializer import SerializerMixin
 
 db = SQLAlchemy()
@@ -18,6 +19,9 @@ class Episode(db.Model, SerializerMixin):
         cascade="all, delete-orphan"
     )
 
+    # Many-to-many via appearances
+    guests = association_proxy("appearances", "guest")
+
     serialize_rules = ("-appearances.episode",)
 
 
@@ -33,6 +37,8 @@ class Guest(db.Model, SerializerMixin):
         back_populates="guest",
         cascade="all, delete-orphan"
     )
+
+    episodes = association_proxy("appearances", "episode")
 
     serialize_rules = ("-appearances.guest",)
 
@@ -50,6 +56,12 @@ class Appearance(db.Model, SerializerMixin):
     guest = db.relationship("Guest", back_populates="appearances")
 
     serialize_rules = ("-episode.appearances", "-guest.appearances")
+
+    @validates("rating")
+    def validate_rating(self, key, rating):
+        if rating < 1 or rating > 5:
+            raise ValueError("Rating must be between 1 and 5.")
+        return rating
 
     @validates("rating")
     def validate_rating(self, key, value):
