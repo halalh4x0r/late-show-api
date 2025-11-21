@@ -1,30 +1,35 @@
-from server.models import User, Bakery, BakedGood
+from server.models import Episode, Guest, Appearance, db
+import pytest
 
-def test_user_password_hashing(session):
-    user = User(username="moha")
-    user.password_hash = "secret123"
-    session.add(user)
-    session.commit()
+def test_episode_guest_relationship(test_app):
+    episode = Episode(date="1/1/2000", number=1)
+    guest = Guest(name="John Doe", occupation="actor")
+    appearance = Appearance(rating=4, episode=episode, guest=guest)
 
-    assert user.id is not None
-    assert user._password_hash != "secret123"
-    assert user.authenticate("secret123") is True
-    assert user.authenticate("wrongpass") is False
+    db.session.add_all([episode, guest, appearance])
+    db.session.commit()
 
-def test_bakery_model_creation(session):
-    bakery = Bakery(name="Sunrise Bakery")
-    session.add(bakery)
-    session.commit()
+    assert guest in episode.guests
+    assert episode in guest.episodes
 
-    assert bakery.id is not None
-    assert bakery.name == "Sunrise Bakery"
+def test_rating_validation(test_app):
+    episode = Episode(date="1/1/2000", number=1)
+    guest = Guest(name="Jane Doe", occupation="singer")
 
-def test_relationships(session):
-    bakery = Bakery(name="Mama’s Bakery")
-    good = BakedGood(name="Donut", price=120, bakery=bakery)
+    with pytest.raises(ValueError):
+        bad_appearance = Appearance(rating=10, episode=episode, guest=guest)
+        db.session.add(bad_appearance)
+        db.session.commit()
 
-    session.add_all([bakery, good])
-    session.commit()
+def test_cascade_delete(test_app):
+    episode = Episode(date="1/1/2000", number=1)
+    guest = Guest(name="John Doe", occupation="actor")
+    appearance = Appearance(rating=4, episode=episode, guest=guest)
 
-    assert good.bakery == bakery
-    assert len(bakery.baked_goods) == 1
+    db.session.add_all([episode, guest, appearance])
+    db.session.commit()
+
+    db.session.delete(episode)
+    db.session.commit()
+
+    assert Appearance.query.count() == 0
